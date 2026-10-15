@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invoice and bank reconciliation demo | Casim Bahadar</title>
+<meta name="description" content="Load an invoices CSV and a bank CSV and see payments matched to invoices in your browser, with unpaid invoices, partial and duplicate payments, and HST errors flagged.">
+<meta name="theme-color" content="#F7F5FB">
+__CSP__
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect x=%275%27 y=%271%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%23A993E4%27/%3E%3Crect x=%271%27 y=%275%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%235A3DB8%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&display=swap">
+<style>
+__BASECSS__
+/* Demo 2 additions */
+.scroll { position: relative; }
+@media (max-width: 40rem) { .stack thead th { white-space: normal; padding: 0; } }
+.stack td:nth-child(1)::before { content: none; }
+.files { display: grid; gap: var(--s4); margin-top: var(--s4); }
+@media (min-width: 40rem) { .files { grid-template-columns: 1fr 1fr; } }
+.file-card { padding: var(--s4); border: 1.5px solid var(--line); border-radius: var(--r-md); background: #fff; }
+.file-card h3 { margin: 0 0 var(--s1); font-size: 1.05rem; }
+.file-card p { margin: 0; }
+.file-card .btn { width: 100%; margin-top: var(--s3); }
+.roles { display: grid; gap: var(--s3); margin: 0; }
+.role { display: grid; gap: var(--s1); }
+.role label { font-weight: 650; }
+.role select { width: 100%; }
+@media (min-width: 40rem) { .role { grid-template-columns: 12rem 1fr; align-items: center; gap: var(--s4); } }
+.map-group { margin-top: var(--s6); padding: var(--s4); border: 1.5px solid var(--line); border-radius: var(--r-md); background: #fff; }
+.map-group h3 { margin: 0 0 var(--s3); font-size: 1.05rem; }
+.map-group .hint { margin: var(--s3) 0 0; }
+.num-field { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+input[type="number"] { font: inherit; font-size: 1rem; width: 6rem; min-height: 2.75rem; padding: var(--s1) var(--s3); border: 1.5px solid var(--slate); border-radius: var(--r-md); background: #fff; color: var(--ink); }
+.money { display: grid; gap: var(--s6); max-width: 44rem; }
+.money-row h4 { margin-bottom: var(--s2); }
+.money-bar { display: flex; gap: 2px; height: 1.5rem; border: 1px solid var(--ink); border-radius: var(--r-sm); overflow: hidden; background: #fff; }
+.money-bar span { display: block; height: 100%; min-width: 4px; }
+.seg-ok { background: var(--violet); }
+.seg-owing { background: #B9A9E8; }
+.seg-bad { background: var(--error); background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,.55) 3px 5px); }
+.seg-review { background: #8A6A12; }
+.money-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s6); margin: var(--s2) 0 0; padding: 0; list-style: none; font-size: 0.9375rem; }
+.money-legend li { display: flex; align-items: center; gap: var(--s2); }
+.money-legend b { font-variant-numeric: tabular-nums; }
+.sw-ok { background: var(--violet); }
+.sw-owing { background: #B9A9E8; border: 1px solid var(--ink); }
+.sw-bad { background: var(--error); background-image: repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.55) 2px 4px); }
+.sw-review { background: #8A6A12; }
+.filter { display: grid; gap: var(--s1); margin: var(--s6) 0 var(--s4); max-width: 24rem; }
+.filter label { font-weight: 650; }
+.tag { display: inline-block; font-size: 0.875rem; font-weight: 700; padding: 0 var(--s2); border-radius: var(--r-md); background: var(--lav); }
+.tag-bad { background: var(--error-bg); color: var(--error); }
+td.money-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.intro-short { padding-bottom: 0; }
+.intro-short + .step { border-top: 0; padding-top: var(--s2); }
+.linkish { font: inherit; font-weight: 650; color: var(--violet); background: none; border: 0; padding: 0; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 0.2em; cursor: pointer; display: inline-flex; align-items: center; min-height: 2.75rem; }
+.manual { display: grid; gap: var(--s2); margin-top: var(--s3); padding-top: var(--s3); border-top: 1px dashed var(--line); }
+.manual label { font-weight: 650; font-size: 0.9375rem; }
+.manual select { width: 100%; }
+.manual .btn { width: 100%; }
+@media (min-width: 40rem) { .manual { grid-template-columns: 1fr auto; align-items: end; } .manual label { grid-column: 1 / -1; } .manual .btn { width: auto; } }
+.btn-inline { min-height: 2.75rem; margin-top: var(--s2); }
+.hand { margin: 0 0 var(--s6); padding: var(--s4); border: 2px solid var(--violet); border-radius: var(--r-md); background: #fff; }
+.hand h4 { margin: 0 0 var(--s2); }
+.hand ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.hand li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2) var(--s4); }
+</style>
+</head>

@@ -1,0 +1,120 @@
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <a class="wordmark" href="https://casimbahadar.github.io/"><span class="mark" aria-hidden="true"></span>Casim Bahadar</a>
+    <span class="demo-flag">Demo with made-up data</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap intro intro-short">
+    <h1>Match bank payments to invoices</h1>
+    <p class="lede">Every payment matched to its invoice, and a short list of what needs a person.</p>
+  </div>
+
+  <section class="wrap step" aria-labelledby="h-load">
+    <div class="step-head"><span class="step-num" aria-hidden="true">1</span><h2 id="h-load">Load the two files</h2></div>
+    <div class="actions"><button class="btn btn-primary" id="btn-sample" type="button">Load sample data</button></div>
+    <div class="privacy"><p><strong>Your files stay on this device.</strong> This page reads them in your browser, and its security settings block it from sending your data anywhere.</p></div>
+    <p class="small muted" style="margin-top: var(--s4)">The sample is 40 invoices and 48 bank lines for a made-up small business. Every name and number in it is invented.</p>
+    <p style="margin: 0"><button class="linkish" id="dl-sample-inv" type="button">Download the sample invoices</button></p>
+    <p style="margin: 0"><button class="linkish" id="dl-sample-bank" type="button">Download the sample bank file</button></p>
+    <details>
+      <summary>What it checks</summary>
+      <p>A payment is matched when its bank description names an invoice number (INV-1042, INV1042, #1042 or "invoice 1042"), whatever the date. A payment with no number is matched when exactly one open invoice has that balance and is dated within a set number of days before it. When two or more fit, it goes to a person instead of being guessed. It flags payments with no invoice, invoices with no payment, partial, duplicate and extra payments, tax that isn't 13% HST on H13 invoices, tax charged on EXEMPT or ZERO invoices, and totals that don't equal subtotal plus tax. You can match any leftover payment by hand, and undo it.</p>
+      <p>Bank files can have one signed amount column or separate deposit and withdrawal columns, with or without a header row. Title lines above the header and totals rows are left out.</p>
+    </details>
+    <div class="files">
+      <div class="file-card">
+        <h3>Invoices</h3>
+        <p class="small muted" id="inv-status">No file loaded yet.</p>
+        <button class="btn btn-quiet" id="btn-inv" type="button">Choose invoices CSV</button>
+        <input type="file" id="file-inv" accept=".csv,.txt,text/csv,text/plain" hidden>
+      </div>
+      <div class="file-card">
+        <h3>Bank statement</h3>
+        <p class="small muted" id="bank-status">No file loaded yet.</p>
+        <button class="btn btn-quiet" id="btn-bank" type="button">Choose bank CSV</button>
+        <input type="file" id="file-bank" accept=".csv,.txt,text/csv,text/plain" hidden>
+      </div>
+    </div>
+    <details id="paste-box">
+      <summary>Paste CSV text instead</summary>
+      <label class="block" for="paste-inv">Invoices CSV, with a header row first</label>
+      <textarea id="paste-inv" spellcheck="false" autocomplete="off"></textarea>
+      <label class="block" for="paste-bank" style="margin-top: var(--s4)">Bank CSV, with a header row first</label>
+      <textarea id="paste-bank" spellcheck="false" autocomplete="off"></textarea>
+      <div class="actions"><button class="btn btn-quiet" id="btn-paste" type="button">Use pasted text</button></div>
+    </details>
+    <div class="alert" id="load-error" role="alert"></div>
+  </section>
+
+  <section class="wrap step" id="step-map" aria-labelledby="h-map" hidden>
+    <div class="step-head"><span class="step-num" aria-hidden="true">2</span><h2 id="h-map" tabindex="-1">Check the columns</h2></div>
+    <p id="map-summary"></p>
+    <details id="map-details">
+      <summary>Change which columns are used</summary>
+      <div class="map-group"><h3>Invoices file</h3><div class="roles" id="roles-inv"></div><p class="hint small muted" id="hint-inv"></p></div>
+      <div class="map-group"><h3>Bank file</h3><div class="roles" id="roles-bank"></div><p class="hint small muted" id="hint-bank"></p></div>
+    </details>
+    <div class="map-group">
+      <h3>Matching without an invoice number</h3>
+      <div class="num-field"><label for="window">Look for invoices dated up to</label><input type="number" id="window" min="1" max="365" value="45" inputmode="numeric"><span>days before the payment</span></div>
+      <p class="hint small muted">Payments that name an invoice number are matched by that number, whatever the date. Invoices with tax code H13 are checked for 13% HST, allowing one cent for rounding. EXEMPT and ZERO invoices are flagged if they charge any tax. Every invoice is checked that subtotal plus tax equals the total.</p>
+    </div>
+    <div class="alert" id="map-error" role="alert"></div>
+    <div class="actions"><button class="btn btn-primary" id="btn-run" type="button">Match payments</button></div>
+  </section>
+
+  <section class="wrap step" id="step-results" aria-labelledby="h-results" hidden>
+    <div class="step-head"><span class="step-num" aria-hidden="true">3</span><h2 id="h-results" tabindex="-1">Results</h2></div>
+    <p class="stale" id="stale" role="status" hidden></p>
+    <p class="summary-line" id="summary"></p>
+    <nav aria-label="Results sections"><ul class="jump">
+      <li><a href="#h-exceptions">Exceptions</a></li>
+      <li><a href="#h-matched">Matched</a></li>
+      <li><a href="#h-download">Download</a></li>
+    </ul></nav>
+
+    <h3>Where the money is</h3>
+    <div class="money" id="money"></div>
+
+    <h3 id="h-exceptions" tabindex="-1">Exceptions</h3>
+    <p class="small muted">Each one needs a person to look at it. Nothing here was changed or guessed.</p>
+    <div class="hand" id="hand" hidden></div>
+    <div class="bars problems" id="bars-exc"></div>
+    <div class="filter" id="filter-wrap"><label for="filter">Show</label><select id="filter"></select></div>
+    <div id="exceptions"></div>
+
+    <h3 id="h-matched">Matched payments</h3>
+    <div id="matched"></div>
+
+    <div id="skipped-wrap" hidden>
+      <h3>Rows that couldn't be read</h3>
+      <div id="skipped"></div>
+    </div>
+
+    <h3 id="h-download">Download</h3>
+    <div class="actions">
+      <button class="btn btn-primary" id="dl-exc" type="button">Download exceptions</button>
+      <button class="btn btn-quiet" id="dl-matched" type="button">Download matched list</button>
+    </div>
+    <div class="actions"><button class="btn btn-quiet" id="btn-reset" type="button">Start over</button></div>
+    <p class="sr-only" id="announce" aria-live="polite"></p>
+  </section>
+
+  <aside class="wrap biz" aria-labelledby="h-biz">
+    <div class="biz-box">
+      <h2 id="h-biz">What this would look like for your business</h2>
+      <p>A version built for you would read the exports your accounting software and bank already give you, use your invoice numbering and your tax rules, and produce the same exceptions list each week or month. Your bookkeeper starts from the short list of things that need a decision instead of ticking off every line.</p>
+      <p><a href="https://casimbahadar.github.io/contact.html">Tell me how you reconcile today</a></p>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built by Casim Bahadar, solutions developer in Kitchener-Waterloo, Ontario.</p>
+    <p><a href="https://casimbahadar.github.io/work.html">See more work</a> or <a href="https://casimbahadar.github.io/contact.html">get in touch</a>.</p>
+  </div>
+</footer>

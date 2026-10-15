@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invoice and bank reconciliation demo | Casim Bahadar</title>
+<meta name="description" content="Load an invoices CSV and a bank CSV and see payments matched to invoices in your browser, with unpaid invoices, partial and duplicate payments, and HST errors flagged.">
+<meta name="theme-color" content="#F7F5FB">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-49iMysUH/svERr6X0C1VYDJKEo5hPZ1J3XfyGUGGjbs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect x=%275%27 y=%271%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%23A993E4%27/%3E%3Crect x=%271%27 y=%275%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%235A3DB8%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&display=swap">
+<style>
+
+/* Tokens. Spacing sits on a 4px scale, radii on three sizes. */
+:root {
+  --paper: #F7F5FB; --mist: #EDE8F7; --lav: #D8CCF3; --violet: #5A3DB8; --violet-deep: #432C93;
+  --ink: #221B35; --slate: #5F5873; --line: #DDD5EE; --error: #A32A3C; --error-bg: #FBEAEE; --changed-bg: #FFF6DB;
+  --s1: 0.25rem; --s2: 0.5rem; --s3: 0.75rem; --s4: 1rem; --s6: 1.5rem; --s8: 2rem; --s12: 3rem; --s16: 4rem;
+  --r-sm: 4px; --r-md: 12px; --r-pill: 999px;
+  --gutter: var(--s4);
+  --font: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (min-width: 40rem) { :root { --gutter: var(--s8); } }
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font);
+  font-size: 1rem; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+@media (min-width: 40rem) { body { font-size: 1.0625rem; } }
+h1, h2, h3, h4 { margin: 0 0 var(--s3); line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 1.4rem + 3vw, 3.2rem); font-weight: 850; letter-spacing: -0.035em; margin-bottom: var(--s4); }
+h2 { font-size: clamp(1.4rem, 1.1rem + 1.2vw, 1.9rem); font-weight: 800; margin: 0; }
+h3 { font-size: 1.2rem; font-weight: 750; margin-top: var(--s12); }
+h4 { font-size: 1.05rem; font-weight: 750; margin-bottom: var(--s1); }
+p { margin: 0 0 var(--s4); max-width: 64ch; }
+a { color: var(--violet); text-decoration-thickness: 1.5px; text-underline-offset: 0.2em; }
+@media (hover: hover) { a:hover { color: var(--violet-deep); } }
+:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; border-radius: var(--r-sm); }
+.wrap { max-width: 62rem; margin-inline: auto; padding-inline: var(--gutter); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.topbar { border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding-block: var(--s4); }
+.wordmark { display: inline-flex; align-items: center; gap: var(--s3); min-height: 2.75rem; color: var(--ink); font-weight: 800; letter-spacing: -0.02em; text-decoration: none; }
+.mark { width: 1rem; height: 1rem; border-radius: var(--r-sm); background: var(--violet); box-shadow: 4px -4px 0 -1px #A993E4; margin-top: var(--s1); }
+.demo-flag { font-size: 0.9375rem; font-weight: 650; color: var(--slate); }
+
+.intro { padding-block: var(--s8) var(--s6); }
+.lede { font-size: 1.125rem; }
+.privacy { max-width: 44rem; margin: 0; padding: var(--s4); background: var(--mist); border-radius: var(--r-md); }
+.privacy p { margin: 0; }
+.privacy strong { font-weight: 750; }
+
+.step { padding-block: var(--s8); border-top: 1px solid var(--line); }
+.step-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
+.step-num { flex: none; display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: var(--r-pill); background: var(--ink); color: var(--paper); font-weight: 800; font-size: 1rem; }
+.muted { color: var(--slate); }
+.small { font-size: 0.9375rem; }
+
+/* One button system. Groups decide width: full width stacked on phones, equal widths in a row. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 3rem; padding: var(--s3) var(--s6);
+  border: 2px solid transparent; border-radius: var(--r-pill);
+  font: inherit; font-size: 1rem; font-weight: 650; line-height: 1.2; text-decoration: none; cursor: pointer;
+}
+.btn-primary { background: var(--violet); color: #fff; }
+.btn-quiet { border-color: var(--ink); color: var(--ink); background: transparent; }
+@media (hover: hover) {
+  .btn-primary:hover { background: var(--violet-deep); color: #fff; }
+  .btn-quiet:hover { background: var(--ink); color: var(--paper); }
+}
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.actions { display: flex; flex-direction: column; gap: var(--s3); margin-block: var(--s4); }
+.actions > .btn { width: 100%; }
+@media (min-width: 40rem) {
+  .actions { flex-direction: row; flex-wrap: wrap; }
+  .actions > .btn { flex: 1 1 0; width: auto; max-width: 16rem; }
+}
+
+details { margin-top: var(--s4); }
+summary { cursor: pointer; font-weight: 650; color: var(--violet); min-height: 2.75rem; display: flex; align-items: center; }
+textarea { width: 100%; min-height: 10rem; font: 1rem/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: var(--s3); border: 1.5px solid var(--slate); border-radius: var(--r-md); background: #fff; color: var(--ink); }
+label.block { display: block; font-weight: 650; margin-bottom: var(--s2); }
+select { font: inherit; font-size: 1rem; min-height: 2.75rem; padding: var(--s1) var(--s2); border: 1.5px solid var(--slate); border-radius: var(--r-md); background: #fff; color: var(--ink); max-width: 100%; }
+input[type="checkbox"], input[type="radio"] { width: 1.25rem; height: 1.25rem; accent-color: var(--violet); margin: 0; flex: none; }
+
+.status { font-weight: 650; margin: var(--s3) 0 0; }
+.alert { margin-top: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--error-bg); color: var(--error); font-weight: 650; border: 1.5px solid var(--error); }
+.info { margin-top: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--mist); }
+.alert:empty, .info:empty { display: none; }
+.stale { margin: 0 0 var(--s6); padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--changed-bg); border: 1.5px solid #8A6A12; font-weight: 650; }
+
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+th, td { text-align: left; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--mist); font-weight: 700; white-space: nowrap; }
+tr:last-child td, tr:last-child th { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.check { display: flex; align-items: center; gap: var(--s2); min-height: 2.75rem; cursor: pointer; }
+.map-table td { vertical-align: middle; }
+.ws { display: inline-block; min-width: 0.6em; color: var(--violet); font-weight: 700; }
+.empty-val { color: var(--slate); font-style: italic; }
+
+fieldset { border: 0; padding: 0; margin: var(--s6) 0 0; }
+legend { font-weight: 700; margin-bottom: var(--s2); padding: 0; }
+.radio { display: flex; align-items: center; gap: var(--s3); min-height: 2.75rem; }
+
+.summary-line { font-size: 1.125rem; font-weight: 600; max-width: 60ch; }
+.summary-line b { font-weight: 850; }
+.jump { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin: 0; padding: 0; list-style: none; }
+.jump a { display: inline-flex; align-items: center; min-height: 2.75rem; font-weight: 650; }
+
+.cellmap { margin: 0; }
+.cellmap svg { display: block; max-width: 100%; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s6); margin: var(--s3) 0 0; padding: 0; list-style: none; font-size: 0.9375rem; }
+.legend li { display: flex; align-items: center; gap: var(--s2); }
+.sw { width: 1rem; height: 1rem; border-radius: var(--r-sm); display: inline-block; }
+.sw-same { background: var(--line); }
+.sw-changed { background: var(--violet); }
+.sw-flag { background: var(--error); background-image: repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.55) 2px 4px); }
+figcaption { font-size: 0.9375rem; color: var(--slate); margin-top: var(--s2); }
+
+.charts { display: grid; gap: 0 var(--s12); }
+.charts > div { min-width: 0; }
+@media (min-width: 52rem) { .charts { grid-template-columns: 1fr 1fr; } }
+.bars { display: grid; gap: var(--s3); max-width: 40rem; }
+.bar-row { display: grid; grid-template-columns: 1fr 2.5rem; align-items: center; gap: var(--s1) var(--s3); font-size: 0.9375rem; }
+.bar-row .bar-track { grid-column: 1 / -1; grid-row: 2; }
+.bar-track { display: block; height: 1rem; background: var(--mist); border-radius: var(--r-pill); overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--violet); border-radius: var(--r-pill); }
+.bars.problems .bar-fill { background: var(--error); }
+.bar-row .n { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+
+.pairs { display: grid; gap: var(--s4); }
+.pair { min-width: 0; border: 1.5px solid var(--line); border-radius: var(--r-md); padding: var(--s4); background: #fff; }
+.pair.is-merged { border-color: var(--violet); background: var(--mist); }
+.pair.is-kept { background: var(--paper); }
+.pair .reason { margin: 0 0 var(--s3); color: var(--slate); font-size: 0.9375rem; }
+.pair table { table-layout: fixed; font-size: 0.875rem; }
+.pair th, .pair td { white-space: normal; overflow-wrap: anywhere; padding: var(--s2) var(--s3); }
+.pair thead th:first-child { width: 30%; }
+.pair th { overflow-wrap: normal; }
+.pair td.diff { background: var(--changed-bg); font-weight: 650; }
+.pair .outcome { font-weight: 650; margin: var(--s3) 0 0; }
+.kind { display: inline-block; font-size: 0.875rem; font-weight: 700; padding: 0 var(--s2); border-radius: var(--r-pill); background: var(--lav); margin-left: var(--s2); vertical-align: 0.1em; }
+
+.req-text { font-size: 0.9375rem; }
+@media (min-width: 40.01rem) { .req-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } }
+@media (max-width: 40rem) {
+  .stack thead, .map-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .stack tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2) var(--s4); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
+  .stack tr:last-child { border-bottom: 0; }
+  .stack td { display: block; padding: 0; border: 0; overflow-wrap: anywhere; }
+  .stack td::before { content: attr(data-label); display: block; font-size: 0.875rem; font-weight: 650; color: var(--slate); }
+  .stack td:nth-child(n+5) { grid-column: 1 / -1; }
+  .stack td:nth-child(1), .stack td:nth-child(2) { font-weight: 750; }
+  .stack td:nth-child(1)::before { content: "Row "; display: inline; font: inherit; color: inherit; }
+  .stack td:nth-child(2)::before { display: none; }
+  .stack td.num { white-space: normal; }
+  .stack-wrap.scroll, .map-wrap.scroll { overflow-x: visible; }
+  .map-table tr { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s1) var(--s4); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
+  .map-table tr:last-child { border-bottom: 0; }
+  .map-table th { grid-column: 1 / -1; background: none; padding: 0; border: 0; white-space: normal; }
+  .map-table td { padding: 0; border: 0; }
+  .map-table td:last-child { grid-column: 1 / -1; font-size: 0.875rem; color: var(--slate); overflow-wrap: anywhere; }
+  .map-table td:last-child::before { content: "First value: "; }
+  .map-table select { width: 100%; }
+}
+
+.biz { margin-block: var(--s8); }
+.biz-box { max-width: 44rem; padding: var(--s6); background: var(--mist); border-radius: var(--r-md); }
+.biz-box h2 { font-size: 1.35rem; margin-bottom: var(--s2); }
+.biz-box p:last-child { margin-bottom: 0; }
+footer { border-top: 1px solid var(--line); padding-block: var(--s6) var(--s12); font-size: 0.9375rem; color: var(--slate); }
+footer p { margin: 0 0 var(--s2); }
+
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+/* Demo 2 additions */
+.scroll { position: relative; }
+@media (max-width: 40rem) { .stack thead th { white-space: normal; padding: 0; } }
+.stack td:nth-child(1)::before { content: none; }
+.files { display: grid; gap: var(--s4); margin-top: var(--s4); }
+@media (min-width: 40rem) { .files { grid-template-columns: 1fr 1fr; } }
+.file-card { padding: var(--s4); border: 1.5px solid var(--line); border-radius: var(--r-md); background: #fff; }
+.file-card h3 { margin: 0 0 var(--s1); font-size: 1.05rem; }
+.file-card p { margin: 0; }
+.file-card .btn { width: 100%; margin-top: var(--s3); }
+.roles { display: grid; gap: var(--s3); margin: 0; }
+.role { display: grid; gap: var(--s1); }
+.role label { font-weight: 650; }
+.role select { width: 100%; }
+@media (min-width: 40rem) { .role { grid-template-columns: 12rem 1fr; align-items: center; gap: var(--s4); } }
+.map-group { margin-top: var(--s6); padding: var(--s4); border: 1.5px solid var(--line); border-radius: var(--r-md); background: #fff; }
+.map-group h3 { margin: 0 0 var(--s3); font-size: 1.05rem; }
+.map-group .hint { margin: var(--s3) 0 0; }
+.num-field { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+input[type="number"] { font: inherit; font-size: 1rem; width: 6rem; min-height: 2.75rem; padding: var(--s1) var(--s3); border: 1.5px solid var(--slate); border-radius: var(--r-md); background: #fff; color: var(--ink); }
+.money { display: grid; gap: var(--s6); max-width: 44rem; }
+.money-row h4 { margin-bottom: var(--s2); }
+.money-bar { display: flex; gap: 2px; height: 1.5rem; border: 1px solid var(--ink); border-radius: var(--r-sm); overflow: hidden; background: #fff; }
+.money-bar span { display: block; height: 100%; min-width: 4px; }
+.seg-ok { background: var(--violet); }
+.seg-owing { background: #B9A9E8; }
+.seg-bad { background: var(--error); background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,.55) 3px 5px); }
+.seg-review { background: #8A6A12; }
+.money-legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s6); margin: var(--s2) 0 0; padding: 0; list-style: none; font-size: 0.9375rem; }
+.money-legend li { display: flex; align-items: center; gap: var(--s2); }
+.money-legend b { font-variant-numeric: tabular-nums; }
+.sw-ok { background: var(--violet); }
+.sw-owing { background: #B9A9E8; border: 1px solid var(--ink); }
+.sw-bad { background: var(--error); background-image: repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.55) 2px 4px); }
+.sw-review { background: #8A6A12; }
+.filter { display: grid; gap: var(--s1); margin: var(--s6) 0 var(--s4); max-width: 24rem; }
+.filter label { font-weight: 650; }
+.tag { display: inline-block; font-size: 0.875rem; font-weight: 700; padding: 0 var(--s2); border-radius: var(--r-md); background: var(--lav); }
+.tag-bad { background: var(--error-bg); color: var(--error); }
+td.money-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.intro-short { padding-bottom: 0; }
+.intro-short + .step { border-top: 0; padding-top: var(--s2); }
+.linkish { font: inherit; font-weight: 650; color: var(--violet); background: none; border: 0; padding: 0; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 0.2em; cursor: pointer; display: inline-flex; align-items: center; min-height: 2.75rem; }
+.manual { display: grid; gap: var(--s2); margin-top: var(--s3); padding-top: var(--s3); border-top: 1px dashed var(--line); }
+.manual label { font-weight: 650; font-size: 0.9375rem; }
+.manual select { width: 100%; }
+.manual .btn { width: 100%; }
+@media (min-width: 40rem) { .manual { grid-template-columns: 1fr auto; align-items: end; } .manual label { grid-column: 1 / -1; } .manual .btn { width: auto; } }
+.btn-inline { min-height: 2.75rem; margin-top: var(--s2); }
+.hand { margin: 0 0 var(--s6); padding: var(--s4); border: 2px solid var(--violet); border-radius: var(--r-md); background: #fff; }
+.hand h4 { margin: 0 0 var(--s2); }
+.hand ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.hand li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2) var(--s4); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <a class="wordmark" href="https://casimbahadar.github.io/"><span class="mark" aria-hidden="true"></span>Casim Bahadar</a>
+    <span class="demo-flag">Demo with made-up data</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap intro intro-short">
+    <h1>Match bank payments to invoices</h1>
+    <p class="lede">Every payment matched to its invoice, and a short list of what needs a person.</p>
+  </div>
+
+  <section class="wrap step" aria-labelledby="h-load">
+    <div class="step-head"><span class="step-num" aria-hidden="true">1</span><h2 id="h-load">Load the two files</h2></div>
+    <div class="actions"><button class="btn btn-primary" id="btn-sample" type="button">Load sample data</button></div>
+    <div class="privacy"><p><strong>Your files stay on this device.</strong> This page reads them in your browser, and its security settings block it from sending your data anywhere.</p></div>
+    <p class="small muted" style="margin-top: var(--s4)">The sample is 40 invoices and 48 bank lines for a made-up small business. Every name and number in it is invented.</p>
+    <p style="margin: 0"><button class="linkish" id="dl-sample-inv" type="button">Download the sample invoices</button></p>
+    <p style="margin: 0"><button class="linkish" id="dl-sample-bank" type="button">Download the sample bank file</button></p>
+    <details>
+      <summary>What it checks</summary>
+      <p>A payment is matched when its bank description names an invoice number (INV-1042, INV1042, #1042 or "invoice 1042"), whatever the date. A payment with no number is matched when exactly one open invoice has that balance and is dated within a set number of days before it. When two or more fit, it goes to a person instead of being guessed. It flags payments with no invoice, invoices with no payment, partial, duplicate and extra payments, tax that isn't 13% HST on H13 invoices, tax charged on EXEMPT or ZERO invoices, and totals that don't equal subtotal plus tax. You can match any leftover payment by hand, and undo it.</p>
+      <p>Bank files can have one signed amount column or separate deposit and withdrawal columns, with or without a header row. Title lines above the header and totals rows are left out.</p>
+    </details>
+    <div class="files">
+      <div class="file-card">
+        <h3>Invoices</h3>
+        <p class="small muted" id="inv-status">No file loaded yet.</p>
+        <button class="btn btn-quiet" id="btn-inv" type="button">Choose invoices CSV</button>
+        <input type="file" id="file-inv" accept=".csv,.txt,text/csv,text/plain" hidden>
+      </div>
+      <div class="file-card">
+        <h3>Bank statement</h3>
+        <p class="small muted" id="bank-status">No file loaded yet.</p>
+        <button class="btn btn-quiet" id="btn-bank" type="button">Choose bank CSV</button>
+        <input type="file" id="file-bank" accept=".csv,.txt,text/csv,text/plain" hidden>
+      </div>
+    </div>
+    <details id="paste-box">
+      <summary>Paste CSV text instead</summary>
+      <label class="block" for="paste-inv">Invoices CSV, with a header row first</label>
+      <textarea id="paste-inv" spellcheck="false" autocomplete="off"></textarea>
+      <label class="block" for="paste-bank" style="margin-top: var(--s4)">Bank CSV, with a header row first</label>
+      <textarea id="paste-bank" spellcheck="false" autocomplete="off"></textarea>
+      <div class="actions"><button class="btn btn-quiet" id="btn-paste" type="button">Use pasted text</button></div>
+    </details>
+    <div class="alert" id="load-error" role="alert"></div>
+  </section>
+
+  <section class="wrap step" id="step-map" aria-labelledby="h-map" hidden>
+    <div class="step-head"><span class="step-num" aria-hidden="true">2</span><h2 id="h-map" tabindex="-1">Check the columns</h2></div>
+    <p id="map-summary"></p>
+    <details id="map-details">
+      <summary>Change which columns are used</summary>
+      <div class="map-group"><h3>Invoices file</h3><div class="roles" id="roles-inv"></div><p class="hint small muted" id="hint-inv"></p></div>
+      <div class="map-group"><h3>Bank file</h3><div class="roles" id="roles-bank"></div><p class="hint small muted" id="hint-bank"></p></div>
+    </details>
+    <div class="map-group">
+      <h3>Matching without an invoice number</h3>
+      <div class="num-field"><label for="window">Look for invoices dated up to</label><input type="number" id="window" min="1" max="365" value="45" inputmode="numeric"><span>days before the payment</span></div>
+      <p class="hint small muted">Payments that name an invoice number are matched by that number, whatever the date. Invoices with tax code H13 are checked for 13% HST, allowing one cent for rounding. EXEMPT and ZERO invoices are flagged if they charge any tax. Every invoice is checked that subtotal plus tax equals the total.</p>
+    </div>
+    <div class="alert" id="map-error" role="alert"></div>
+    <div class="actions"><button class="btn btn-primary" id="btn-run" type="button">Match payments</button></div>
+  </section>
+
+  <section class="wrap step" id="step-results" aria-labelledby="h-results" hidden>
+    <div class="step-head"><span class="step-num" aria-hidden="true">3</span><h2 id="h-results" tabindex="-1">Results</h2></div>
+    <p class="stale" id="stale" role="status" hidden></p>
+    <p class="summary-line" id="summary"></p>
+    <nav aria-label="Results sections"><ul class="jump">
+      <li><a href="#h-exceptions">Exceptions</a></li>
+      <li><a href="#h-matched">Matched</a></li>
+      <li><a href="#h-download">Download</a></li>
+    </ul></nav>
+
+    <h3>Where the money is</h3>
+    <div class="money" id="money"></div>
+
+    <h3 id="h-exceptions" tabindex="-1">Exceptions</h3>
+    <p class="small muted">Each one needs a person to look at it. Nothing here was changed or guessed.</p>
+    <div class="hand" id="hand" hidden></div>
+    <div class="bars problems" id="bars-exc"></div>
+    <div class="filter" id="filter-wrap"><label for="filter">Show</label><select id="filter"></select></div>
+    <div id="exceptions"></div>
+
+    <h3 id="h-matched">Matched payments</h3>
+    <div id="matched"></div>
+
+    <div id="skipped-wrap" hidden>
+      <h3>Rows that couldn't be read</h3>
+      <div id="skipped"></div>
+    </div>
+
+    <h3 id="h-download">Download</h3>
+    <div class="actions">
+      <button class="btn btn-primary" id="dl-exc" type="button">Download exceptions</button>
+      <button class="btn btn-quiet" id="dl-matched" type="button">Download matched list</button>
+    </div>
+    <div class="actions"><button class="btn btn-quiet" id="btn-reset" type="button">Start over</button></div>
+    <p class="sr-only" id="announce" aria-live="polite"></p>
+  </section>
+
+  <aside class="wrap biz" aria-labelledby="h-biz">
+    <div class="biz-box">
+      <h2 id="h-biz">What this would look like for your business</h2>
+      <p>A version built for you would read the exports your accounting software and bank already give you, use your invoice numbering and your tax rules, and produce the same exceptions list each week or month. Your bookkeeper starts from the short list of things that need a decision instead of ticking off every line.</p>
+      <p><a href="https://casimbahadar.github.io/contact.html">Tell me how you reconcile today</a></p>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built by Casim Bahadar, solutions developer in Kitchener-Waterloo, Ontario.</p>
+    <p><a href="https://casimbahadar.github.io/work.html">See more work</a> or <a href="https://casimbahadar.github.io/contact.html">get in touch</a>.</p>
+  </div>
+</footer>
+<script>/* CORE-START: pure functions, no page access. Tests call these through window.Recon. */
+const Recon = (() => {
+  const HST_RATE = 13;
+
+  function detectDelimiter(text) {
+    let line = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') q = !q;
+      else if (!q && (c === "\n" || c === "\r")) break;
+      line += q ? "" : c;
+    }
+    const counts = { ",": 0, ";": 0, "\t": 0 };
+    for (const c of line) if (c in counts) counts[c]++;
+    let best = ",";
+    for (const d of [";", "\t"]) if (counts[d] > counts[best]) best = d;
+    return best;
+  }
+
+  function parseCSV(text, label) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const delim = detectDelimiter(text);
+    const records = [];
+    let field = "", fields = [], inQuotes = false, line = 1, quoteLine = 0;
+    const end = () => { fields.push(field); field = ""; records.push(fields); fields = []; };
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+        else { if (c === "\n") line++; field += c; }
+        continue;
+      }
+      if (c === '"' && field === "") { inQuotes = true; quoteLine = line; }
+      else if (c === delim) { fields.push(field); field = ""; }
+      else if (c === "\r") { if (text[i + 1] === "\n") i++; end(); line++; }
+      else if (c === "\n") { end(); line++; }
+      else field += c;
+    }
+    if (inQuotes) throw new Error("In the " + label + ", line " + quoteLine + " opens a quote that never closes. Check that line for a stray \" character.");
+    if (field !== "" || fields.length) end();
+    const rows = [];
+    records.forEach((f, i) => { if (f.some(v => v.trim() !== "")) rows.push({ row: i + 1, cells: f.map(v => v.trim()) }); });
+    if (!rows.length) throw new Error("The " + label + " is empty.");
+    const width = Math.max(...rows.map(r => r.cells.length));
+    // A data row has a date and an amount in it. Some bank exports have no header row at all,
+    // and some report exports put title lines above the header.
+    const isData = r => { const cs = r.cells.filter(v => v !== ""); return cs.some(v => dateParts(v)) && cs.some(v => !dateParts(v) && /\d/.test(v) && parseMoney(v) !== null); };
+    let hi = 0, noHeader = false;
+    if (isData(rows[0])) noHeader = true;
+    else {
+      const need = Math.max(2, Math.ceil(width * 0.5));
+      const found = rows.slice(0, 10).findIndex(r => r.cells.filter(v => v !== "").length >= need && !isData(r));
+      hi = found < 0 ? 0 : found;
+    }
+    const headers = [];
+    for (let i = 0; i < width; i++) headers.push(noHeader ? "Column " + (i + 1) : (rows[hi].cells[i] || "Column " + (i + 1)));
+    const bodyRaw = noHeader ? rows : rows.slice(hi + 1);
+    if (!bodyRaw.length) throw new Error("The " + label + " has a header row but no data rows.");
+    const totalRows = [], body = [];
+    for (const r of bodyRaw) {
+      const c = r.cells.slice(); while (c.length < width) c.push("");
+      if (c.some(v => /^(grand )?totals?\b/i.test(v))) totalRows.push(r.row); else body.push({ row: r.row, cells: c });
+    }
+    return { headers, rows: body, delimiter: delim, noHeader, titleRows: noHeader ? 0 : hi, totalRows };
+  }
+
+  const ROLES = {
+    inv: [
+      ["number", "Invoice number", true], ["customer", "Customer", false], ["date", "Invoice date", true],
+      ["subtotal", "Subtotal before tax", false], ["code", "Tax code", false], ["tax", "Tax", false], ["total", "Total", true]
+    ],
+    bank: [
+      ["date", "Date", true], ["desc", "Description", true], ["desc2", "More description", false], ["amount", "Amount (one column, deposits positive)", false],
+      ["deposit", "Deposit column", false], ["withdrawal", "Withdrawal column", false]
+    ]
+  };
+  const PATTERNS = {
+    inv: [
+      ["date", /^(?!.*due).*date/i], ["code", /tax ?(code|type|class)|^code$/i], ["subtotal", /sub ?-?total|before tax|pre-?tax|net amount|^net$/i],
+      ["tax", /^(tax|hst|gst|sales tax|tax amount|hst amount|tps|tvh)$/i], ["total", /total|amount due|gross|^amount$|montant/i],
+      ["customer", /customer|client|bill ?to|source name|name/i], ["number", /invoice|inv\b|number|^num$|no\.?$|#|facture/i]
+    ],
+    bank: [
+      ["date", /date|posted/i], ["deposit", /deposit|credit|money in|paid in|d[ée]p[oô]t/i], ["withdrawal", /withdraw|debit|money out|paid out|retrait/i],
+      ["amount", /amount|value|montant|cad ?\$/i], ["desc", /desc|detail|memo|payee|transaction|narrative|name|libell/i], ["desc2", /desc|detail|memo|payee|narrative|libell/i]
+    ]
+  };
+  // For a file with no header row: work columns out from what's in them.
+  function guessByContent(t, kind) {
+    const sample = t.rows.slice(0, 300), roles = {};
+    const stats = t.headers.map((h, c) => {
+      const vals = sample.map(r => r.cells[c]).filter(v => v !== "");
+      const dates = vals.filter(v => dateParts(v)).length;
+      const nums = vals.filter(v => !dateParts(v) && /\d/.test(v) && parseMoney(v) !== null).length;
+      return { c, filled: vals.length / Math.max(1, sample.length), date: dates / Math.max(1, vals.length), num: nums / Math.max(1, vals.length), len: vals.reduce((s, v) => s + v.length, 0) / Math.max(1, vals.length) };
+    });
+    const dateCol = stats.filter(s => s.date >= 0.8).sort((a, b) => b.date - a.date)[0];
+    if (dateCol) roles.date = dateCol.c;
+    const numeric = stats.filter(s => s.c !== roles.date && s.num >= 0.8);
+    const text = stats.filter(s => s.c !== roles.date && s.num < 0.5).sort((a, b) => b.len - a.len);
+    if (kind === "bank") {
+      if (text[0]) roles.desc = text[0].c;
+      let pair = null;
+      for (let i = 0; i < numeric.length && !pair; i++) for (let j = i + 1; j < numeric.length && !pair; j++) {
+        const a = numeric[i].c, b = numeric[j].c;
+        const one = sample.filter(r => (r.cells[a] !== "") !== (r.cells[b] !== "")).length;
+        if (one >= sample.length * 0.9) pair = [a, b];
+      }
+      if (pair) { roles.withdrawal = pair[0]; roles.deposit = pair[1]; }
+      else if (numeric[0]) roles.amount = numeric[0].c;
+    } else {
+      if (numeric.length) roles.total = numeric[numeric.length - 1].c;
+      const num = stats.find(s => s.c !== roles.date && sample.every(r => /^[A-Z#-]{0,6}\d+$/i.test(r.cells[s.c])));
+      if (num) roles.number = num.c;
+    }
+    return roles;
+  }
+  function guessRoles(headers, kind, table) {
+    if (table && table.noHeader) return guessByContent(table, kind);
+    const roles = {}, taken = new Set();
+    for (const [role, re] of PATTERNS[kind]) {
+      const i = headers.findIndex((h, j) => !taken.has(j) && re.test(h));
+      if (i >= 0) { roles[role] = i; taken.add(i); }
+    }
+    if (roles.amount !== undefined && (roles.deposit !== undefined || roles.withdrawal !== undefined)) delete roles.amount;
+    return roles;
+  }
+
+  // Money to integer cents. Handles $, CA$, spaces, (brackets) and a decimal comma.
+  function parseMoney(s) {
+    let v = String(s || "").replace(/[\s\u00A0]/g, "").replace(/^(CA|CAD|C)?\$|\$$|CAD$/gi, "");
+    if (v === "") return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(v)) { neg = true; v = v.slice(1, -1); }
+    if (/^-/.test(v)) { neg = !neg; v = v.slice(1); }
+    v = v.replace(/^\$/, "");
+    const lastDot = v.lastIndexOf("."), lastComma = v.lastIndexOf(",");
+    if (lastDot >= 0 && lastComma >= 0) {
+      if (lastComma > lastDot) v = v.replace(/\./g, "").replace(",", ".");
+      else v = v.replace(/,/g, "");
+    } else if (lastComma >= 0) {
+      v = /,\d{2}$/.test(v) && (v.match(/,/g) || []).length === 1 ? v.replace(",", ".") : v.replace(/,/g, "");
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(v)) return null;
+    const [w, f = ""] = v.split(".");
+    const c = parseInt(w, 10) * 100 + parseInt((f + "00").slice(0, 2), 10);
+    return neg ? -c : c;
+  }
+  const fmtMoney = c => (c < 0 ? "-" : "") + "$" + Math.floor(Math.abs(c) / 100).toLocaleString("en-CA") + "." + String(Math.abs(c) % 100).padStart(2, "0");
+
+  const MONTHS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  const MOIS = { janvier: 1, janv: 1, fevrier: 2, fevr: 2, mars: 3, avril: 4, avr: 4, mai: 5, juin: 6, juillet: 7, juil: 7, aout: 8, septembre: 9, sept: 9, octobre: 10, novembre: 11, decembre: 12 };
+  function monthOf(w) {
+    const f = w.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\.$/, "");
+    return MOIS[f] || MONTHS.indexOf(f.slice(0, 3)) + 1;
+  }
+  // Returns {y, m, d} when the order is known, {a, b, y} when it depends on the file's order, or null.
+  function dateParts(s) {
+    const v = String(s || "").trim().replace(/[T ]\d{1,2}:\d{2}.*$/, "");
+    let r;
+    if ((r = v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) return { y: +r[1], m: +r[2], d: +r[3] };
+    if ((r = v.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) return { a: +r[1], b: +r[2], y: +r[3] };
+    if ((r = v.match(/^([A-Za-z]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})$/))) { const m = monthOf(r[1]); return m ? { y: +r[3], m, d: +r[2] } : null; }
+    const fr = v.replace(/^le\s+/i, "").replace(/^(\d{1,2})er\b/i, "$1");
+    if ((r = fr.match(/^(\d{1,2})[\s-]+([A-Za-z\u00C0-\u00FF]{3,}\.?),?[\s-]+(\d{4})$/))) { const m = monthOf(r[2]); return m ? { y: +r[3], m, d: +r[1] } : null; }
+    return null;
+  }
+  // Works out whether a file writes day or month first, from any date where one part is over 12.
+  function detectOrder(values) {
+    let day = null, month = null, needs = false;
+    for (const v of values) {
+      const p = dateParts(v);
+      if (!p || p.a === undefined) continue;
+      if (p.a > 12 && p.b <= 12) day = day || v;
+      else if (p.b > 12 && p.a <= 12) month = month || v;
+      else if (p.a !== p.b) needs = true;
+    }
+    if (day && month) return { order: "conflict", example: day + " and " + month };
+    if (day) return { order: "day", example: day };
+    if (month) return { order: "month", example: month };
+    return { order: needs ? "unknown" : "none", example: "" };
+  }
+  function toDay(p, order) {
+    if (!p) return null;
+    let y = p.y, m = p.m, d = p.d;
+    if (p.a !== undefined) {
+      if (p.a === p.b) { m = p.a; d = p.b; }
+      else if (order === "day") { d = p.a; m = p.b; }
+      else if (order === "month") { m = p.a; d = p.b; }
+      else return null;
+    }
+    if (m < 1 || m > 12 || d < 1 || d > new Date(Date.UTC(y, m, 0)).getUTCDate()) return null;
+    return Date.UTC(y, m - 1, d) / 86400000;
+  }
+  const fmtDay = n => new Date(n * 86400000).toISOString().slice(0, 10);
+
+  const norm = s => String(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Finds invoice numbers named in a bank description.
+  function findRefs(desc, byNorm, byDigits) {
+    const up = String(desc).toUpperCase();
+    const found = new Set(), unknown = new Set();
+    const re = /(#\s*)?\b([A-Z]{1,4})?[\s\-_.:#]*(\d{3,})\b/g;
+    let m;
+    while ((m = re.exec(up))) {
+      const hash = /#/.test(m[0]), prefix = m[2] || "", digits = m[3];
+      const word = up.slice(Math.max(0, m.index - 9), m.index);
+      const full = prefix + digits;
+      if (prefix && byNorm.has(full)) { found.add(byNorm.get(full)); continue; }
+      const invWord = /\b(INVOICE|INV|NO)[\s.:#]*$/.test(word) || /^(INV|INVOICE|NO)$/.test(prefix);
+      if ((hash || invWord || prefix === "INV") && byDigits.has(digits)) { const n = byDigits.get(digits); if (n) { found.add(n); continue; } }
+      if (prefix === "INV" || hash || invWord) unknown.add((prefix || "#") + (prefix ? "-" : "") + digits);
+    }
+    return { found: [...found], unknown: [...unknown] };
+  }
+
+  function readInvoices(t, roles, order) {
+    const out = [], skipped = [], seen = new Map();
+    for (const tr of t.totalRows || []) skipped.push({ file: "Invoices", row: tr, reason: "Totals row, left out" });
+    const get = (r, k) => roles[k] === undefined ? "" : r.cells[roles[k]];
+    for (const r of t.rows) {
+      const num = get(r, "number");
+      const bad = why => skipped.push({ file: "Invoices", row: r.row, reason: why });
+      if (!num) { bad("No invoice number"); continue; }
+      if (seen.has(norm(num))) { bad("Invoice number " + num + " already appears on row " + seen.get(norm(num))); continue; }
+      const day = toDay(dateParts(get(r, "date")), order);
+      if (day === null) { bad("Invoice date \"" + get(r, "date") + "\" isn't a date that can be read"); continue; }
+      const total = parseMoney(get(r, "total"));
+      if (total === null) { bad("Total \"" + get(r, "total") + "\" isn't a number"); continue; }
+      const hasTax = roles.subtotal !== undefined && roles.tax !== undefined;
+      const sub = hasTax ? parseMoney(get(r, "subtotal")) : null, tax = hasTax ? (get(r, "tax") === "" ? 0 : parseMoney(get(r, "tax"))) : null;
+      if (hasTax && (sub === null || tax === null)) { bad("Subtotal or tax isn't a number"); continue; }
+      seen.set(norm(num), r.row);
+      const code = roles.code === undefined ? "H13" : (get(r, "code").toUpperCase().replace(/\s/g, "") || "H13");
+      out.push({ num, customer: get(r, "customer"), day, sub, tax, total, code, row: r.row, paid: 0, links: [] });
+    }
+    return { invoices: out, skipped };
+  }
+
+  function readBank(t, roles, order) {
+    const deposits = [], skipped = [];
+    for (const tr of t.totalRows || []) skipped.push({ file: "Bank", row: tr, reason: "Totals row, left out" });
+    let withdrawals = 0;
+    const get = (r, k) => roles[k] === undefined ? "" : r.cells[roles[k]];
+    for (const r of t.rows) {
+      const bad = why => skipped.push({ file: "Bank", row: r.row, reason: why });
+      const day = toDay(dateParts(get(r, "date")), order);
+      if (day === null) { bad("Date \"" + get(r, "date") + "\" isn't a date that can be read"); continue; }
+      let amt;
+      if (roles.amount !== undefined) {
+        amt = parseMoney(get(r, "amount"));
+        if (amt === null) { bad("Amount \"" + get(r, "amount") + "\" isn't a number"); continue; }
+      } else {
+        const dep = parseMoney(get(r, "deposit")), wd = parseMoney(get(r, "withdrawal"));
+        if (dep === null && wd === null) { bad("No deposit or withdrawal amount"); continue; }
+        amt = (dep || 0) - Math.abs(wd || 0);
+      }
+      if (amt <= 0) { withdrawals++; continue; }
+      deposits.push({ row: r.row, day, desc: [get(r, "desc"), get(r, "desc2")].filter(Boolean).join(" "), amt, links: [], status: "" });
+    }
+    return { deposits, withdrawals, skipped };
+  }
+
+  const TYPES = {
+    unmatched: "Payment with no invoice", unpaid: "Invoice with no payment", partial: "Partly paid",
+    duplicate: "Duplicate payment", overpaid: "Overpayment", review: "Needs review",
+    hst: "Tax isn't 13% HST", taxonexempt: "Tax on an untaxed invoice", totalmismatch: "Total doesn't add up", taxcode: "Unknown tax code"
+  };
+
+  function reconcile(invT, invRoles, invOrder, bankT, bankRoles, bankOrder, windowDays, manual) {
+    manual = manual || {};
+    const { invoices, skipped: s1 } = readInvoices(invT, invRoles, invOrder);
+    const { deposits, withdrawals, skipped: s2 } = readBank(bankT, bankRoles, bankOrder);
+    const exceptions = [];
+    const exc = (type, o) => exceptions.push(Object.assign({ type, label: TYPES[type], invoice: "", payRow: null, payDay: null, amount: null, reason: "" }, o));
+    const byNorm = new Map(), digitCount = new Map(), byDigits = new Map();
+    for (const inv of invoices) {
+      byNorm.set(norm(inv.num), inv.num);
+      const d = (inv.num.match(/(\d+)\D*$/) || [])[1];
+      if (d) { digitCount.set(d, (digitCount.get(d) || 0) + 1); byDigits.set(d, inv.num); }
+    }
+    for (const [d, n] of digitCount) if (n > 1) byDigits.set(d, null);
+    const byNum = new Map(invoices.map(i => [i.num, i]));
+    const order = deposits.slice().sort((a, b) => a.day - b.day || a.row - b.row);
+    const link = (dep, inv, amt, rule) => { inv.paid += amt; inv.links.push({ row: dep.row, amt }); dep.links.push({ num: inv.num, amt, rule }); };
+
+    function applyRef(dep, inv, rule) {
+      const bal = inv.total - inv.paid;
+      if (bal <= 0) {
+        const same = dep.amt === inv.total || inv.links.some(l => l.amt === dep.amt);
+        exc(same ? "duplicate" : "overpaid", { invoice: inv.num, payRow: dep.row, payDay: dep.day, amount: dep.amt,
+          reason: (same ? "Same amount as a payment already received for " : "Extra payment for ") + inv.num + ", which was already paid in full" + (inv.links.length ? " by bank row " + inv.links.map(l => l.row).join(" and ") : "") + "." });
+        dep.status = "exception";
+        return;
+      }
+      if (dep.amt > bal) {
+        link(dep, inv, dep.amt, rule);
+        exc("overpaid", { invoice: inv.num, payRow: dep.row, payDay: dep.day, amount: dep.amt, reason: "Paid " + fmtMoney(dep.amt) + " when " + fmtMoney(bal) + " was owing, " + fmtMoney(dep.amt - bal) + " too much." });
+        dep.status = "matched";
+        return;
+      }
+      link(dep, inv, dep.amt, rule);
+      dep.status = "matched";
+    }
+
+    // Pass 0: matches a person made by hand
+    for (const dep of order) {
+      const n = manual[dep.row];
+      if (n && byNum.has(n)) { applyRef(dep, byNum.get(n), "Matched by hand"); dep.manual = true; }
+    }
+    // Pass 1: payments that name an invoice
+    for (const dep of order) {
+      if (dep.status) continue;
+      const refs = findRefs(dep.desc, byNorm, byDigits);
+      dep.unknown = refs.unknown;
+      if (refs.found.length === 1) applyRef(dep, byNum.get(refs.found[0]), "Invoice number in description");
+      else if (refs.found.length > 1) {
+        const invs = refs.found.map(n => byNum.get(n));
+        const owing = invs.reduce((s, i) => s + Math.max(0, i.total - i.paid), 0);
+        if (owing === dep.amt && invs.every(i => i.total > i.paid)) { invs.forEach(i => link(dep, i, i.total - i.paid, "Invoice numbers in description")); dep.status = "matched"; }
+        else { exc("review", { invoice: refs.found.join(", "), payRow: dep.row, payDay: dep.day, amount: dep.amt, reason: "Names " + refs.found.join(" and ") + ", but the amount doesn't equal what's owing on them (" + fmtMoney(owing) + ")." }); dep.status = "exception"; }
+      }
+    }
+    // Pass 2: payments with no invoice number, by exact balance inside the date window
+    for (const dep of order) {
+      if (dep.status) continue;
+      const cands = invoices.filter(i => i.total - i.paid === dep.amt && dep.day >= i.day && dep.day <= i.day + windowDays);
+      const named = dep.unknown && dep.unknown.length ? " It names " + dep.unknown.join(", ") + ", which isn't in the invoice list." : "";
+      if (cands.length === 1) { link(dep, cands[0], dep.amt, "Amount and date" + (named ? " (named invoice not found)" : "")); dep.status = "matched"; }
+      else if (cands.length > 1) { exc("review", { invoice: cands.map(c => c.num).join(", "), payRow: dep.row, payDay: dep.day, amount: dep.amt, reason: "Could be any of " + cands.length + " invoices with the same balance: " + cands.map(c => c.num).join(", ") + "." + named }); dep.status = "exception"; }
+      else {
+        exc("unmatched", { payRow: dep.row, payDay: dep.day, amount: dep.amt, reason: named ? named.trim() + " No other invoice matches the amount." : "No invoice number in the description, and no invoice with a balance of " + fmtMoney(dep.amt) + " dated up to " + windowDays + " days before it." });
+        dep.status = "exception";
+      }
+    }
+    // Invoice-level checks
+    for (const inv of invoices) {
+      if (inv.paid === 0) exc("unpaid", { invoice: inv.num, amount: inv.total, reason: "No payment found for " + inv.num + (inv.customer ? " (" + inv.customer + ")" : "") + ", dated " + fmtDay(inv.day) + "." });
+      else if (inv.paid < inv.total) exc("partial", { invoice: inv.num, amount: inv.total - inv.paid, reason: "Paid " + fmtMoney(inv.paid) + " of " + fmtMoney(inv.total) + ". " + fmtMoney(inv.total - inv.paid) + " still owing." });
+      if (inv.sub === null) continue;
+      if (inv.code === "H13") {
+        const expected = Math.floor((inv.sub * HST_RATE + 50) / 100);
+        if (Math.abs(inv.tax - expected) > 1) exc("hst", { invoice: inv.num, amount: inv.tax, reason: "Tax is " + fmtMoney(inv.tax) + ". 13% of " + fmtMoney(inv.sub) + " is " + fmtMoney(expected) + "." });
+      } else if (inv.code === "EXEMPT" || inv.code === "ZERO") {
+        if (inv.tax !== 0) exc("taxonexempt", { invoice: inv.num, amount: inv.tax, reason: "Tax code " + inv.code + " means no tax, but " + fmtMoney(inv.tax) + " tax was charged." });
+      } else {
+        exc("taxcode", { invoice: inv.num, amount: inv.tax, reason: "Tax code \"" + inv.code + "\" isn't H13, EXEMPT or ZERO, so the tax wasn't checked." });
+      }
+    }
+    for (const inv of invoices) {
+      if (inv.sub !== null && inv.sub + inv.tax !== inv.total) exc("totalmismatch", { invoice: inv.num, amount: inv.total, reason: "Subtotal " + fmtMoney(inv.sub) + " plus tax " + fmtMoney(inv.tax) + " is " + fmtMoney(inv.sub + inv.tax) + ", but the total says " + fmtMoney(inv.total) + "." });
+    }
+    const matched = [];
+    for (const dep of order) for (const l of dep.links) {
+      const inv = byNum.get(l.num);
+      const status = inv.paid === inv.total ? (inv.links.length > 1 ? "Paid in " + inv.links.length + " payments" : "Paid") : inv.paid < inv.total ? "Partly paid" : "Overpaid";
+      matched.push({ payRow: dep.row, payDay: dep.day, desc: dep.desc, amount: l.amt, invoice: l.num, rule: l.rule, status });
+    }
+    const rank = { duplicate: 1, unmatched: 2, overpaid: 3, review: 4, partial: 5, unpaid: 6, totalmismatch: 7, hst: 8, taxonexempt: 9, taxcode: 10 };
+    exceptions.sort((a, b) => rank[a.type] - rank[b.type] || (a.payRow || 0) - (b.payRow || 0) || a.invoice.localeCompare(b.invoice));
+    const sum = (xs, f) => xs.reduce((s, x) => s + f(x), 0);
+    const totals = {
+      invoiced: sum(invoices, i => i.total),
+      collected: sum(invoices, i => Math.min(i.paid, i.total)),
+      owing: sum(invoices, i => Math.max(0, i.total - i.paid)),
+      received: sum(deposits, d => d.amt),
+      depMatched: sum(matched, m => m.amount),
+      depDuplicate: sum(exceptions.filter(e => e.type === "duplicate" || (e.type === "overpaid" && e.payRow !== null && !deposits.find(d => d.row === e.payRow).links.length)), e => e.amount),
+      depUnmatched: sum(exceptions.filter(e => e.type === "unmatched"), e => e.amount),
+      depReview: sum(exceptions.filter(e => e.type === "review"), e => e.amount)
+    };
+    const taxChecked = invRoles.subtotal !== undefined && invRoles.tax !== undefined;
+    return { invoices, deposits, withdrawals, matched, exceptions, skipped: s1.concat(s2), totals, windowDays, taxChecked, manualCount: deposits.filter(d => d.manual).length };
+  }
+
+  function toCSV(headers, rows) {
+    const q = v => { const s = String(v); return /[",\r\n]|^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    return [headers, ...rows].map(r => r.map(q).join(",")).join("\r\n") + "\r\n";
+  }
+
+  return { ROLES, TYPES, parseCSV, guessRoles, parseMoney, fmtMoney, dateParts, detectOrder, findRefs, reconcile, toCSV, fmtDay };
+})();
+window.Recon = Recon;
+/* CORE-END */
+
+const SAMPLE_INV = "Invoice number,Customer,Invoice date,Subtotal,Tax code,Tax,Total\nINV-1001,Priya Raman,2026-06-02,525.75,H13,68.35,594.10\nINV-1002,Omar Haddad,2026-06-03,960.75,H13,124.90,\"1,085.65\"\nINV-1003,Grace Liu,2026-06-05,2475.25,H13,321.78,\"2,797.03\"\nINV-1004,Liam Fraser,2026-06-07,3100.25,H13,403.03,\"3,503.28\"\nINV-1005,Sofia Rossi,2026-06-10,150.00,H13,19.50,169.50\nINV-1006,Yusuf Khan,2026-06-11,150.00,H13,19.50,169.50\nINV-1007,Nadia Petrova,2026-06-13,750.00,H13,97.50,847.50\nINV-1008,Owen Clarke,2026-06-16,1650.75,EXEMPT,0.00,\"1,650.75\"\nINV-1009,Mei Tanaka,2026-06-18,225.50,H13,29.32,254.82\nINV-1010,Ravi Kapoor,2026-06-19,360.50,ZERO,0.00,360.50\nINV-1011,Tessa Kaur,2026-06-21,480.00,H13,62.40,542.40\nINV-1012,Diego Morales,2026-06-23,150.75,H13,19.60,170.35\nINV-1013,Fiona Walsh,2026-06-26,1150.75,H13,138.09,\"1,288.84\"\nINV-1014,Adam Kowal,2026-06-27,481.37,H13,62.58,543.95\nINV-1015,Sara Lindberg,2026-06-29,2475.00,H13,321.75,\"2,796.75\"\nINV-1016,Kofi Asante,2026-07-01,437.85,H13,56.93,494.78\nINV-1017,Emily Harper,2026-07-04,360.25,H13,46.83,407.08\nINV-1018,Hana Sato,2026-07-06,1480.00,H13,192.40,\"1,672.40\"\nINV-1019,Zoe Laurent,2026-07-08,480.25,ZERO,62.43,542.68\nINV-1020,Caleb Hughes,2026-07-10,960.50,H13,124.87,\"1,085.37\"\nINV-1021,Leila Nasser,2026-07-12,3100.75,H13,155.04,\"3,255.79\"\nINV-1022,Victor Lindqvist,2026-07-14,2475.75,H13,321.85,\"2,797.60\"\nINV-1023,Julia Novak,2026-07-15,151.37,H13,19.68,181.05\nINV-1024,Isaac Mensah,2026-07-18,2476.37,H13,321.93,\"2,798.30\"\nINV-1025,Aisha Bello,2026-07-19,300.25,H13,39.03,339.28\nINV-1026,Ben Hofstetter,2026-07-21,1150.25,H13,149.53,\"1,299.78\"\nINV-1027,Chloe Dubois,2026-07-24,525.00,H13,68.25,593.25\nINV-1028,Mateo Alvarez,2026-07-26,1150.50,H13,149.57,\"1,300.07\"\nINV-1029,Amara Okeke,2026-07-27,751.37,H13,97.68,849.05\nINV-1030,Noah Martin,2026-07-30,300.00,H13,39.00,339.00\nINV-1031,Ines Carvalho,2026-07-31,1275.00,H13,165.75,\"1,440.75\"\nINV-1032,Wei Zhang,2026-08-03,3100.00,H13,403.00,\"3,503.00\"\nINV-1033,Rachel Bauer,2026-08-04,525.25,H13,68.28,593.53\nINV-1034,Ethan Brooks,2026-08-07,1275.75,H13,165.85,\"1,441.60\"\nINV-1035,Marcus Reid,2026-08-08,752.74,H13,97.86,850.60\nINV-1036,Lucas DeSouza,2026-08-11,300.75,H13,39.10,339.85\nINV-1037,Anna Kowalski,2026-08-13,2477.74,H13,322.11,\"2,799.85\"\nINV-1038,Farah Siddiqui,2026-08-15,226.87,H13,29.49,256.36\nINV-1039,Jon Tremblay,2026-08-16,225.75,H13,29.35,255.10\nINV-1040,Maya Patel,2026-08-18,527.12,H13,68.53,595.65\n";
+const SAMPLE_BANK = "Date,Description,Withdrawal,Deposit\n6/11/2026,DEPOSIT #1004,,3503.28\n6/12/2026,CHEQUE DEPOSIT REF INVOICE 1003,,2797.03\n6/16/2026,ONLINE BANKING PAYMENT INV1007,,847.50\n6/17/2026,EFT CREDIT ROSSI S - INV-1005,,169.50\n6/26/2026,ONLINE BANKING PAYMENT INV1002,,1085.65\n7/1/2026,RENT PAYMENT,1850.00,\n7/2/2026,DEPOSIT #1001,,594.10\n7/2/2026,MONTHLY ACCOUNT FEE,16.95,\n7/3/2026,EFT CREDIT KAPOOR R - INV-1010,,360.50\n7/7/2026,CHEQUE DEPOSIT REF INVOICE 1006,,169.50\n7/9/2026,ONLINE BANKING PAYMENT INV1014,,543.95\n7/11/2026,EFT CREDIT MORALES D - INV-1012,,170.35\n7/12/2026,ONLINE BANKING PAYMENT INV1016,,494.78\n7/15/2026,DEPOSIT #1008,,1650.75\n7/16/2026,ONLINE BANKING PAYMENT INV1009,,254.82\n7/19/2026,EFT CREDIT LINDBERG S - INV-1015,,2796.75\n7/21/2026,EFT CREDIT HUGHES C - INV-1020,,1085.37\n7/21/2026,ONLINE BANKING PAYMENT INV1018,,1672.40\n7/22/2026,BRANCH DEPOSIT,,812.40\n7/25/2026,ONLINE BANKING PAYMENT INV1021,,3255.79\n7/26/2026,CHEQUE DEPOSIT REF INVOICE 1013,,1288.84\n7/28/2026,ONLINE BANKING PAYMENT INV1026,,1299.78\n7/30/2026,CHEQUE DEPOSIT REF INVOICE 1027,,593.25\n7/31/2026,DEPOSIT #1023,,181.05\n7/31/2026,E-TRANSFER RECEIVED AMARA OKEKE,,849.05\n7/31/2026,E-TRANSFER RECEIVED EMILY HARPER INV-1017,,407.08\n8/1/2026,ONLINE BANKING PAYMENT INV1028,,1300.07\n8/2/2026,E-TRANSFER RECEIVED ZOE LAURENT INV-1019,,542.68\n8/5/2026,SOFTWARE SUBSCRIPTION,56.50,\n8/9/2026,E-TRANSFER RECEIVED RACHEL BAUER INV-1033,,296.76\n8/11/2026,CHEQUE DEPOSIT REF INVOICE 1024,,2798.30\n8/11/2026,E-TRANSFER RECEIVED WEI ZHANG,,3503.00\n8/13/2026,EFT CREDIT LINDQVIST V - INV-1022,,2797.60\n8/14/2026,E-TRANSFER RECEIVED K ABARA,,300.00\n8/15/2026,ONLINE BANKING PAYMENT INV1025,,339.28\n8/18/2026,BRANCH DEPOSIT,,1440.75\n8/19/2026,DEPOSIT #1034,,1341.60\n8/20/2026,DEPOSIT #1035,,600.60\n8/20/2026,INSURANCE PREMIUM,213.40,\n8/23/2026,MOBILE CHEQUE DEPOSIT,,339.00\n8/24/2026,CHEQUE DEPOSIT REF INVOICE 1039,,255.10\n8/25/2026,CHEQUE DEPOSIT REF INVOICE 1039,,255.10\n8/26/2026,CHEQUE DEPOSIT REF INVOICE 1040,,595.65\n8/27/2026,CHEQUE DEPOSIT REF INVOICE 1040,,595.65\n8/30/2026,CHEQUE DEPOSIT REF INVOICE 1011,,542.40\n9/3/2026,ONLINE BANKING PAYMENT INV-2099,,452.00\n9/8/2026,E-TRANSFER RECEIVED RACHEL BAUER INV-1033,,296.77\n9/15/2026,ACCOUNTANT FEE,339.00,\n";
+
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const state = { inv: null, bank: null, roles: { inv: {}, bank: {} }, order: { inv: "none", bank: "none" }, result: null, filter: "all", showAll: { exc: false, matched: false }, manual: {} };
+  const M = Recon.fmtMoney;
+
+  function setError(id, msg) { $(id).textContent = msg || ""; }
+
+  function loadText(kind, text, label) {
+    const name = kind === "inv" ? "invoices file" : "bank file";
+    try {
+      if (!text || !text.trim()) throw new Error("The " + name + " is empty.");
+      state[kind] = Recon.parseCSV(text, name);
+    } catch (e) {
+      state[kind] = null;
+      $(kind === "inv" ? "inv-status" : "bank-status").textContent = "Couldn't read " + label + ".";
+      setError("load-error", e.message);
+      return false;
+    }
+    const t = state[kind];
+    $(kind === "inv" ? "inv-status" : "bank-status").textContent = label + ": " + t.rows.length + " rows, " + t.headers.length + " columns.";
+    state.roles[kind] = Recon.guessRoles(t.headers, kind, t);
+    state.manual = {};
+    const di = state.roles[kind].date;
+    state.order[kind] = di === undefined ? "none" : Recon.detectOrder(t.rows.map(r => r.cells[di])).order;
+    return true;
+  }
+
+  function afterLoad() {
+    state.result = null;
+    $("step-results").hidden = true;
+    if (!state.inv || !state.bank) { $("step-map").hidden = true; return; }
+    setError("load-error", "");
+    renderRoles();
+    const problems = validate().filter(p => !/days/.test(p));
+    const headless = ["inv", "bank"].filter(k => state[k].noHeader);
+    $("map-details").open = problems.length > 0 || headless.length > 0;
+    const named = k => { const di = state.roles[k].date; return di !== undefined && state[k].rows.slice(0, 20).some(r => /[A-Za-z\u00C0-\u00FF]{3,}/.test(r.cells[di])); };
+    const orderText = k => named(k) && state.order[k] === "none" ? "written with month names" : ({ none: "year first", day: "day first", month: "month first" }[state.order[k]] || "unclear");
+    const name = k => k === "inv" ? "invoices file" : "bank file";
+    const notes = [];
+    for (const k of headless) notes.push("The " + name(k) + " has no header row, so its columns were matched by what's in them. Check them below.");
+    for (const k of ["inv", "bank"]) if (state[k].titleRows) notes.push("Skipped " + state[k].titleRows + (state[k].titleRows === 1 ? " title line" : " title lines") + " above the header in the " + name(k) + ".");
+    if (state.roles.inv.subtotal === undefined || state.roles.inv.tax === undefined) notes.push("The invoices file has no subtotal or tax column, so the tax and total checks will be skipped.");
+    $("map-summary").textContent = (problems.length
+      ? "Some columns or date orders need your choice before matching. They're listed below."
+      : "Found every column needed in both files. Invoice dates are " + orderText("inv") + " and bank dates are " + orderText("bank") + ".") + (notes.length ? " " + notes.join(" ") : "");
+    $("step-map").hidden = false;
+    $("h-map").focus({ preventScroll: true });
+    $("step-map").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+
+  function renderRoles() {
+    for (const kind of ["inv", "bank"]) {
+      const t = state[kind], roles = state.roles[kind];
+      const first = i => { const r = t.rows.find(x => x.cells[i] !== ""); return r ? r.cells[i] : ""; };
+      const opts = '<option value="">Not in this file</option>' + t.headers.map((h, i) => '<option value="' + i + '">' + esc(h) + (t.noHeader ? ", like " + esc(first(i).slice(0, 30)) : "") + "</option>").join("");
+      let html = Recon.ROLES[kind].map(([role, label, req]) =>
+        '<div class="role"><label for="r-' + kind + "-" + role + '">' + esc(label) + (req ? "" : ' <span class="muted small">(optional)</span>') + "</label>" +
+        '<select id="r-' + kind + "-" + role + '" data-kind="' + kind + '" data-role="' + role + '">' + opts + "</select></div>").join("");
+      html += '<div class="role"><label for="o-' + kind + '">Date order</label><select id="o-' + kind + '" data-kind="' + kind + '" data-order="1">' +
+        '<option value="none">Year first, like 2026-07-03</option><option value="day">Day first, like 03/07/2026</option><option value="month">Month first, like 07/03/2026</option><option value="unknown">Not sure</option></select></div>';
+      $("roles-" + kind).innerHTML = html;
+      for (const [role] of Recon.ROLES[kind]) $("r-" + kind + "-" + role).value = roles[role] === undefined ? "" : String(roles[role]);
+      $("o-" + kind).value = state.order[kind] === "conflict" ? "unknown" : state.order[kind];
+      orderHint(kind);
+    }
+  }
+  function orderHint(kind) {
+    const t = state[kind], di = state.roles[kind].date;
+    const det = di === undefined ? { order: "none" } : Recon.detectOrder(t.rows.map(r => r.cells[di]));
+    const msg = { day: "Dates read as day first, because of " + det.example + ".", month: "Dates read as month first, because of " + det.example + ".",
+      none: "", unknown: "Some dates could be day or month first. Choose the date order above.", conflict: "This file mixes date orders (" + det.example + "). Check the date column." }[det.order];
+    $("hint-" + kind).textContent = msg;
+  }
+
+  document.addEventListener("change", e => {
+    const el = e.target;
+    if (!el.dataset.kind) return;
+    const kind = el.dataset.kind;
+    if (el.dataset.order) state.order[kind] = el.value;
+    else if (el.value === "") delete state.roles[kind][el.dataset.role];
+    else state.roles[kind][el.dataset.role] = +el.value;
+    if (el.dataset.role === "date") { const di = state.roles[kind].date; state.order[kind] = di === undefined ? "none" : Recon.detectOrder(state[kind].rows.map(r => r.cells[di])).order; $("o-" + kind).value = state.order[kind] === "conflict" ? "unknown" : state.order[kind]; orderHint(kind); }
+    markStale();
+  });
+  $("window").addEventListener("input", markStale);
+
+  function markStale() {
+    if (!state.result) return;
+    $("stale").textContent = "You changed a setting, so these results are out of date. Tap Match payments to update them.";
+    $("stale").hidden = false;
+    $("btn-run").textContent = "Match payments again";
+  }
+
+  function validate() {
+    const missing = [];
+    for (const kind of ["inv", "bank"]) {
+      for (const [role, label, req] of Recon.ROLES[kind]) if (req && state.roles[kind][role] === undefined) missing.push((kind === "inv" ? "Invoices: " : "Bank: ") + label);
+      if (state.order[kind] === "unknown" || state.order[kind] === "conflict") missing.push((kind === "inv" ? "Invoices" : "Bank") + ": date order");
+    }
+    const b = state.roles.bank;
+    if (b.amount === undefined && b.deposit === undefined) missing.push("Bank: an amount column or a deposit column");
+    const w = +$("window").value;
+    if (!Number.isInteger(w) || w < 1 || w > 365) missing.push("A number of days from 1 to 365");
+    return missing;
+  }
+
+  function run() {
+    const missing = validate();
+    if (missing.length) { setError("map-error", "Choose these before matching: " + missing.join("; ") + "."); return; }
+    setError("map-error", "");
+    state.result = Recon.reconcile(state.inv, state.roles.inv, state.order.inv, state.bank, state.roles.bank, state.order.bank, +$("window").value, state.manual);
+    state.filter = "all";
+    state.showAll = { exc: false, matched: false };
+    $("stale").hidden = true;
+    $("btn-run").textContent = "Match payments";
+    $("step-results").hidden = false;
+    render();
+    $("h-results").focus();
+  }
+
+  function render() {
+    const r = state.result;
+    const deps = r.deposits.length, inv = r.invoices.length;
+    const invLinked = new Set(r.matched.map(m => m.invoice)).size;
+    const payLinked = new Set(r.matched.map(m => m.payRow)).size;
+    const n = (k, one, many) => "<b>" + k + "</b> " + (k === 1 ? one : many);
+    $("summary").innerHTML = n(deps, "deposit", "deposits") + " and " + n(inv, "invoice", "invoices") + " checked. " + n(payLinked, "payment", "payments") + " matched to " + n(invLinked, "invoice", "invoices") + ". " +
+      n(r.exceptions.length, "exception needs", "exceptions need") + " a person to look." +
+      (r.withdrawals ? " " + r.withdrawals + (r.withdrawals === 1 ? " withdrawal was" : " withdrawals were") + " left out." : "") +
+      (r.manualCount ? " " + r.manualCount + (r.manualCount === 1 ? " payment was" : " payments were") + " matched by hand." : "") +
+      (r.taxChecked ? "" : " Tax and total checks were skipped because the invoices file has no subtotal or tax column.");
+    renderMoney();
+    renderHand();
+    renderExcBars();
+    renderFilter();
+    renderTables();
+    const sk = r.skipped;
+    $("skipped-wrap").hidden = !sk.length;
+    if (sk.length) $("skipped").innerHTML = table(["File", "Row", "Problem"], sk.map(s => [esc(s.file), s.row, esc(s.reason)]), null);
+  }
+
+  function moneyRow(title, total, parts) {
+    const segs = parts.filter(p => p[1] > 0);
+    return '<div class="money-row"><h4>' + esc(title) + " " + M(total) + '</h4><div class="money-bar" aria-hidden="true">' +
+      segs.map(p => '<span class="' + p[2] + '" style="width:' + (p[1] / total * 100).toFixed(2) + '%"></span>').join("") + '</div><ul class="money-legend">' +
+      parts.map(p => '<li><span class="sw ' + p[2].replace("seg", "sw") + '"></span>' + esc(p[0]) + " <b>" + M(p[1]) + "</b></li>").join("") + "</ul></div>";
+  }
+  function renderHand() {
+    const rows = Object.keys(state.manual).map(Number).sort((a, b) => a - b);
+    $("hand").hidden = !rows.length;
+    $("hand").innerHTML = rows.length ? "<h4>Matched by hand</h4><ul>" + rows.map(r => "<li><span>Bank row " + r + " to " + esc(state.manual[r]) + '</span><button class="btn btn-quiet" type="button" data-unmatch="' + r + '">Undo</button></li>').join("") + "</ul>" : "";
+  }
+  function renderMoney() {
+    const t = state.result.totals;
+    $("money").innerHTML =
+      moneyRow("Invoiced", t.invoiced, [["Collected", t.collected, "seg-ok"], ["Still owing", t.owing, "seg-owing"]]) +
+      moneyRow("Deposited", t.received, [["Matched to invoices", t.depMatched, "seg-ok"], ["Duplicate or extra", t.depDuplicate, "seg-bad"], ["No invoice found", t.depUnmatched, "seg-owing"], ["Needs review", t.depReview, "seg-review"]].filter(p => p[1] > 0 || p[2] === "seg-ok"));
+  }
+  function renderExcBars() {
+    const counts = {};
+    for (const e of state.result.exceptions) counts[e.label] = (counts[e.label] || 0) + 1;
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) { $("bars-exc").innerHTML = '<p class="muted">No exceptions. Every payment matched and every invoice is paid.</p>'; return; }
+    const max = Math.max(...entries.map(e => e[1]));
+    $("bars-exc").innerHTML = entries.map(([k, n]) => '<div class="bar-row"><span>' + esc(k) + '</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="width:' + (n / max * 100).toFixed(1) + '%"></span></span><span class="n">' + n + "</span></div>").join("");
+  }
+  function renderFilter() {
+    const ex = state.result.exceptions, types = [...new Set(ex.map(e => e.type))];
+    $("filter-wrap").hidden = types.length < 2;
+    $("filter").innerHTML = '<option value="all">All exceptions (' + ex.length + ")</option>" +
+      types.map(t => '<option value="' + t + '">' + esc(Recon.TYPES[t]) + " (" + ex.filter(e => e.type === t).length + ")</option>").join("");
+    $("filter").value = state.filter;
+  }
+  $("filter").addEventListener("change", () => {
+    state.filter = $("filter").value;
+    state.showAll.exc = false;
+    renderTables();
+  });
+
+  const payCell = (row, day) => row === null ? '<span class="muted">None</span>' : "Bank row " + row + ", " + Recon.fmtDay(day);
+  function renderTables() {
+    const r = state.result;
+    const ex = r.exceptions.filter(e => state.filter === "all" || e.type === state.filter);
+    const open = r.invoices.filter(i => i.total - i.paid > 0);
+    const picker = e => {
+      if (e.payRow === null || (e.type !== "unmatched" && e.type !== "review") || !open.length) return "";
+      const opts = open.slice().sort((a, b) => Math.abs(a.total - a.paid - e.amount) - Math.abs(b.total - b.paid - e.amount) || b.day - a.day).slice(0, 200)
+        .map(i => '<option value="' + esc(i.num) + '">' + esc(i.num) + " owes " + M(i.total - i.paid) + (i.customer ? ", " + esc(i.customer) : "") + "</option>").join("");
+      return '<div class="manual"><label for="mm-' + e.payRow + '">Match this payment to</label><select id="mm-' + e.payRow + '">' + opts + '</select><button class="btn btn-quiet" type="button" data-manual="' + e.payRow + '">Match</button></div>';
+    };
+    $("exceptions").innerHTML = table(["Problem", "Invoice", "Payment", "Amount", "Why"],
+      ex.map(e => ['<span class="tag tag-bad">' + esc(e.label) + "</span>", e.invoice ? esc(e.invoice) : '<span class="muted">None</span>', payCell(e.payRow, e.payDay), M(e.amount), esc(e.reason) + picker(e)]), "exc", "exceptions", 3);
+    $("matched").innerHTML = table(["Invoice", "Status", "Payment", "Amount", "Bank description", "Matched by"],
+      r.matched.map(m => [esc(m.invoice), '<span class="tag">' + esc(m.status) + "</span>", payCell(m.payRow, m.payDay), M(m.amount), esc(m.desc),
+        esc(m.rule) + (m.rule === "Matched by hand" ? ' <button class="btn btn-quiet btn-inline" type="button" data-unmatch="' + m.payRow + '">Undo this match</button>' : "")]), "matched", "matched payments", 3);
+  }
+  function table(headers, rows, key, noun, moneyCol) {
+    if (!rows.length) return '<p class="muted">None.</p>';
+    const limit = key && !state.showAll[key] ? 20 : 1000;
+    const shown = rows.slice(0, limit);
+    let html = '<div class="scroll stack-wrap"><table class="stack" role="table"><thead role="rowgroup"><tr role="row">' + headers.map(h => '<th scope="col" role="columnheader">' + h + "</th>").join("") + '</tr></thead><tbody role="rowgroup">' +
+      shown.map(r => '<tr role="row">' + r.map((v, i) => '<td role="cell" data-label="' + headers[i] + '"' + (i === moneyCol ? ' class="money-cell"' : "") + ">" + v + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>";
+    if (key && rows.length > shown.length) html += '<div class="actions"><button class="btn btn-quiet" data-more="' + key + '" type="button">Show all ' + rows.length + " " + noun + "</button></div>";
+    else if (rows.length > 1000) html += '<p class="small muted">Showing the first 1,000 of ' + rows.length + ". The download has all of them.</p>";
+    return html;
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-more]");
+    if (!b) return;
+    state.showAll[b.dataset.more] = true;
+    renderTables();
+  });
+  // Manual matching reruns the whole reconciliation, so partial payments, duplicates and totals stay consistent.
+  function rerun(message) {
+    state.result = Recon.reconcile(state.inv, state.roles.inv, state.order.inv, state.bank, state.roles.bank, state.order.bank, +$("window").value, state.manual);
+    $("stale").hidden = true; $("btn-run").textContent = "Match payments";
+    render();
+    $("announce").textContent = message;
+    $("h-exceptions").focus();
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-manual], [data-unmatch]");
+    if (!b) return;
+    if (b.dataset.manual) {
+      const row = +b.dataset.manual, num = $("mm-" + row).value;
+      state.manual[row] = num;
+      rerun("Bank row " + row + " matched to " + num + " by hand.");
+    } else {
+      const row = +b.dataset.unmatch;
+      delete state.manual[row];
+      rerun("Hand match for bank row " + row + " undone.");
+    }
+  });
+
+  function download(filename, text) {
+    const blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  const money = c => (c < 0 ? "-" : "") + Math.floor(Math.abs(c) / 100) + "." + String(Math.abs(c) % 100).padStart(2, "0");
+  $("dl-exc").addEventListener("click", () => {
+    download("exceptions.csv", Recon.toCSV(["Problem", "Invoice", "Bank row", "Payment date", "Amount", "Why"],
+      state.result.exceptions.map(e => [e.label, e.invoice, e.payRow === null ? "" : e.payRow, e.payDay === null ? "" : Recon.fmtDay(e.payDay), money(e.amount), e.reason])));
+  });
+  $("dl-matched").addEventListener("click", () => {
+    download("matched-payments.csv", Recon.toCSV(["Invoice", "Invoice status", "Bank row", "Payment date", "Amount applied", "Bank description", "Matched by"],
+      state.result.matched.map(m => [m.invoice, m.status, m.payRow, Recon.fmtDay(m.payDay), money(m.amount), m.desc, m.rule])));
+  });
+
+  function readFile(input, kind) {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let text;
+      try { text = new TextDecoder("utf-8", { fatal: true }).decode(reader.result); }
+      catch (e) { text = new TextDecoder("windows-1252").decode(reader.result); }
+      setError("load-error", "");
+      if (loadText(kind, text, f.name)) afterLoad();
+      input.value = "";
+    };
+    reader.onerror = () => setError("load-error", "The file couldn't be read. Try saving it again as CSV.");
+    reader.readAsArrayBuffer(f);
+  }
+  $("btn-inv").addEventListener("click", () => $("file-inv").click());
+  $("btn-bank").addEventListener("click", () => $("file-bank").click());
+  $("file-inv").addEventListener("change", () => readFile($("file-inv"), "inv"));
+  $("file-bank").addEventListener("change", () => readFile($("file-bank"), "bank"));
+  $("btn-sample").addEventListener("click", () => {
+    setError("load-error", "");
+    loadText("inv", SAMPLE_INV, "Sample invoices");
+    loadText("bank", SAMPLE_BANK, "Sample bank statement");
+    $("window").value = 45;
+    afterLoad();
+  });
+  $("dl-sample-inv").addEventListener("click", () => download("sample-invoices.csv", SAMPLE_INV));
+  $("dl-sample-bank").addEventListener("click", () => download("sample-bank.csv", SAMPLE_BANK));
+  $("btn-paste").addEventListener("click", () => {
+    setError("load-error", "");
+    const a = loadText("inv", $("paste-inv").value, "Pasted invoices");
+    const b = a && loadText("bank", $("paste-bank").value, "Pasted bank statement");
+    if (a && b) afterLoad();
+  });
+  $("btn-run").addEventListener("click", run);
+  $("btn-reset").addEventListener("click", () => {
+    state.inv = state.bank = state.result = null;
+    state.manual = {};
+    $("step-map").hidden = true; $("step-results").hidden = true;
+    $("inv-status").textContent = "No file loaded yet."; $("bank-status").textContent = "No file loaded yet.";
+    $("paste-inv").value = ""; $("paste-bank").value = "";
+    setError("load-error", ""); setError("map-error", "");
+    $("btn-sample").focus();
+    window.scrollTo(0, 0);
+  });
+})();
+</script>
+</body>
+</html>

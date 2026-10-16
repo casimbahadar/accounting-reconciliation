@@ -6,7 +6,7 @@
 <title>Invoice and bank reconciliation demo | Casim Bahadar</title>
 <meta name="description" content="Load an invoices CSV and a bank CSV and see payments matched to invoices in your browser, with unpaid invoices, partial and duplicate payments, and HST errors flagged.">
 <meta name="theme-color" content="#F7F5FB">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-49iMysUH/svERr6X0C1VYDJKEo5hPZ1J3XfyGUGGjbs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-dcaYiF8rsQ15AnYXZIWb/KBwa3j0bA7RWPYpEzPsWPE='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect x=%275%27 y=%271%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%23A993E4%27/%3E%3Crect x=%271%27 y=%275%27 width=%2710%27 height=%2710%27 rx=%272%27 fill=%27%235A3DB8%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -864,7 +864,8 @@ const SAMPLE_BANK = "Date,Description,Withdrawal,Deposit\n6/11/2026,DEPOSIT #100
     $("btn-run").textContent = "Match payments";
     $("step-results").hidden = false;
     render();
-    $("h-results").focus();
+    $("h-results").focus({ preventScroll: true });
+    $("step-results").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }
 
   function render() {
@@ -1024,6 +1025,8 @@ const SAMPLE_BANK = "Date,Description,Withdrawal,Deposit\n6/11/2026,DEPOSIT #100
     loadText("bank", SAMPLE_BANK, "Sample bank statement");
     $("window").value = 45;
     afterLoad();
+    // The sample goes straight to results in one tap. The column check stays visible above them.
+    run();
   });
   $("dl-sample-inv").addEventListener("click", () => download("sample-invoices.csv", SAMPLE_INV));
   $("dl-sample-bank").addEventListener("click", () => download("sample-bank.csv", SAMPLE_BANK));

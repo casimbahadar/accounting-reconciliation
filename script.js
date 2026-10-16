@@ -504,7 +504,8 @@ const SAMPLE_BANK = __SAMPLE_BANK__;
     $("btn-run").textContent = "Match payments";
     $("step-results").hidden = false;
     render();
-    $("h-results").focus();
+    $("h-results").focus({ preventScroll: true });
+    $("step-results").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }
 
   function render() {
@@ -664,6 +665,8 @@ const SAMPLE_BANK = __SAMPLE_BANK__;
     loadText("bank", SAMPLE_BANK, "Sample bank statement");
     $("window").value = 45;
     afterLoad();
+    // The sample goes straight to results in one tap. The column check stays visible above them.
+    run();
   });
   $("dl-sample-inv").addEventListener("click", () => download("sample-invoices.csv", SAMPLE_INV));
   $("dl-sample-bank").addEventListener("click", () => download("sample-bank.csv", SAMPLE_BANK));
